@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellar DID Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            padding: 40px 0;
+        }
+
+        header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #f0f0f0;
+            margin-bottom: 30px;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .copy-btn {
+            background: #6c757d;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            margin-left: 10px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background: #28a745;
+        }
+
+        .status-offline {
+            background: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⭐ Stellar DID Platform</h1>
+            <p>Decentralized Identity on the Stellar Network</p>
+            <div id="status" style="margin-top: 20px;">
+                <span class="status-indicator status-offline"></span>
+                <span id="status-text">Checking connection...</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('create')">Create DID</button>
+                <button class="tab" onclick="showTab('resolve')">Resolve DID</button>
+                <button class="tab" onclick="showTab('credentials')">Credentials</button>
+                <button class="tab" onclick="showTab('account')">Account Info</button>
+            </div>
+
+            <!-- Create DID Tab -->
+            <div id="create-tab" class="tab-content active">
+                <h2>Create New DID</h2>
+                <form id="create-did-form">
+                    <div class="form-group">
+                        <label for="service-endpoint">Service Endpoint (Optional)</label>
+                        <input type="url" id="service-endpoint" placeholder="https://your-service.com/endpoint">
+                    </div>
+                    <button type="submit">Create DID</button>
+                </form>
+                <div id="create-result" class="result hidden"></div>
+            </div>
+
+            <!-- Resolve DID Tab -->
+            <div id="resolve-tab" class="tab-content">
+                <h2>Resolve DID</h2>
+                <form id="resolve-did-form">
+                    <div class="form-group">
+                        <label for="did-input">DID</label>
+                        <input type="text" id="did-input" placeholder="did:stellar:GABCD..." required>
+                    </div>
+                    <button type="submit">Resolve DID</button>
+                </form>
+                <div id="resolve-result" class="result hidden"></div>
+            </div>
+
+            <!-- Credentials Tab -->
+            <div id="credentials-tab" class="tab-content">
+                <h2>Verifiable Credentials</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Issue Credential</h3>
+                        <form id="issue-credential-form">
+                            <div class="form-group">
+                                <label for="issuer-did">Issuer DID</label>
+                                <input type="text" id="issuer-did" placeholder="did:stellar:GABCD..." required>
+                            </div>
+                            <div class="form-group">
+                                <label for="subject-did">Subject DID</label>
+                                <input type="text" id="subject-did" placeholder="did:stellar:GABCD..." required>
+                            </div>
+                            <div class="form-group">
+                                <label for="credential-type">Credential Type</label>
+                                <select id="credential-type">
+                                    <option value="university-degree">University Degree</option>
+                                    <option value="professional-license">Professional License</option>
+                                    <option value="age-verification">Age Verification</option>
+                                    <option value="employment-verification">Employment Verification</option>
+                                </select>
+                            </div>
+                            <button type="submit">Issue Credential</button>
+                        </form>
+                        <div id="issue-result" class="result hidden"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Verify Credential</h3>
+                        <form id="verify-credential-form">
+                            <div class="form-group">
+                                <label for="credential-input">Credential JSON</label>
+                                <textarea id="credential-input" rows="8" placeholder="Paste credential JSON here..." required></textarea>
+                            </div>
+                            <button type="submit">Verify Credential</button>
+                        </form>
+                        <div id="verify-result" class="result hidden"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Info Tab -->
+            <div id="account-tab" class="tab-content">
+                <h2>Account Information</h2>
+                <form id="account-form">
+                    <div class="form-group">
+                        <label for="account-public-key">Stellar Public Key</label>
+                        <input type="text" id="account-public-key" placeholder="GABCD..." required>
+                    </div>
+                    <button type="submit">Get Account Info</button>
+                </form>
+                <div id="account-result" class="result hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        // Tab switching
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // API helper
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'API call failed');
+                }
+                
+                return result;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        // Show result
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.classList.remove('hidden', 'success', 'error');
+            element.classList.add(isError ? 'error' : 'success');
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        // Check server status
+        async function checkStatus() {
+            try {
+                const result = await apiCall('/health');
+                document.getElementById('status-text').textContent = 'Connected to ' + result.network;
+                document.querySelector('.status-indicator').classList.remove('status-offline');
+                document.querySelector('.status-indicator').classList.add('status-online');
+            } catch (error) {
+                document.getElementById('status-text').textContent = 'Connection failed';
+                document.querySelector('.status-indicator').classList.remove('status-online');
+                document.querySelector('.status-indicator').classList.add('status-offline');
+            }
+        }
+
+        // Create DID
+        document.getElementById('create-did-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const serviceEndpoint = document.getElementById('service-endpoint').value;
+            
+            try {
+                const result = await apiCall('/did/create', 'POST', {
+                    serviceEndpoint: serviceEndpoint || undefined
+                });
+                showResult('create-result', result);
+            } catch (error) {
+                showResult('create-result', { error: error.message }, true);
+            }
+        });
+
+        // Resolve DID
+        document.getElementById('resolve-did-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const did = document.getElementById('did-input').value;
+            
+            try {
+                const result = await apiCall(`/did/resolve/${encodeURIComponent(did)}`);
+                showResult('resolve-result', result);
+            } catch (error) {
+                showResult('resolve-result', { error: error.message }, true);
+            }
+        });
+
+        // Issue Credential
+        document.getElementById('issue-credential-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const issuerDid = document.getElementById('issuer-did').value;
+            const subjectDid = document.getElementById('subject-did').value;
+            const credentialType = document.getElementById('credential-type').value;
+            
+            // Predefined claims based on type
+            const claimsMap = {
+                'university-degree': {
+                    degree: 'Bachelor of Science',
+                    major: 'Computer Science',
+                    university: 'Stellar University',
+                    graduationDate: '2023-06-15'
+                },
+                'professional-license': {
+                    licenseType: 'Software Engineer',
+                    licenseNumber: 'SE20230001',
+                    issuingBoard: 'Tech Certification Board',
+                    status: 'Active'
+                },
+                'age-verification': {
+                    isOver18: true,
+                    isOver21: true,
+                    verificationMethod: 'Document Verification'
+                },
+                'employment-verification': {
+                    employer: 'Stellar Tech Inc.',
+                    position: 'Blockchain Developer',
+                    currentEmployee: true
+                }
+            };
+            
+            try {
+                const result = await apiCall('/credentials/issue', 'POST', {
+                    issuerDid,
+                    subjectDid,
+                    claims: claimsMap[credentialType],
+                    type: [credentialType]
+                });
+                showResult('issue-result', result);
+            } catch (error) {
+                showResult('issue-result', { error: error.message }, true);
+            }
+        });
+
+        // Verify Credential
+        document.getElementById('verify-credential-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const credentialText = document.getElementById('credential-input').value;
+            
+            try {
+                const credential = JSON.parse(credentialText);
+                const result = await apiCall('/credentials/verify', 'POST', {
+                    credential
+                });
+                showResult('verify-result', result);
+            } catch (error) {
+                showResult('verify-result', { error: error.message }, true);
+            }
+        });
+
+        // Get Account Info
+        document.getElementById('account-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const publicKey = document.getElementById('account-public-key').value;
+            
+            try {
+                const result = await apiCall(`/did/account/${encodeURIComponent(publicKey)}`);
+                showResult('account-result', result);
+            } catch (error) {
+                showResult('account-result', { error: error.message }, true);
+            }
+        });
+
+        // Initialize
+        checkStatus();
+    </script>
+</body>
+</html>

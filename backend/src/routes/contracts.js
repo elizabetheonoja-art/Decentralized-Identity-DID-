@@ -1,8 +1,7 @@
 const express = require('express');
 const Joi = require('joi');
 const ContractService = require('../services/contractService');
-const { authMiddleware } = require('../middleware');
-const logger = require('../utils/logger');
+const { authMiddleware, logger } = require('../middleware');
 
 const router = express.Router();
 const contractService = new ContractService();
@@ -40,7 +39,7 @@ const issueCredentialSchema = Joi.object({
  * POST /api/v1/contracts/deploy
  * Deploy DID registry contract
  */
-router.post('/deploy', async (req, res) => {
+router.post('/deploy', async (req, res, next) => {
   try {
     const { error, value } = deployContractSchema.validate(req.body);
     
@@ -64,11 +63,7 @@ router.post('/deploy', async (req, res) => {
       message: 'Contract deployed successfully'
     });
   } catch (error) {
-    logger.error('Contract deployment error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -76,7 +71,7 @@ router.post('/deploy', async (req, res) => {
  * POST /api/v1/contracts/register-did
  * Register a new DID on the blockchain
  */
-router.post('/register-did', async (req, res) => {
+router.post('/register-did', async (req, res, next) => {
   try {
     const { error, value } = registerDIDSchema.validate(req.body);
     
@@ -105,11 +100,7 @@ router.post('/register-did', async (req, res) => {
       message: 'DID registered successfully'
     });
   } catch (error) {
-    logger.error('DID registration error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -117,7 +108,7 @@ router.post('/register-did', async (req, res) => {
  * PUT /api/v1/contracts/update-did
  * Update DID document on blockchain
  */
-router.put('/update-did', async (req, res) => {
+router.put('/update-did', async (req, res, next) => {
   try {
     const { error, value } = updateDIDSchema.validate(req.body);
     
@@ -141,11 +132,7 @@ router.put('/update-did', async (req, res) => {
       message: 'DID updated successfully'
     });
   } catch (error) {
-    logger.error('DID update error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -153,7 +140,7 @@ router.put('/update-did', async (req, res) => {
  * POST /api/v1/contracts/issue-credential
  * Issue verifiable credential on blockchain
  */
-router.post('/issue-credential', async (req, res) => {
+router.post('/issue-credential', async (req, res, next) => {
   try {
     const { error, value } = issueCredentialSchema.validate(req.body);
     
@@ -187,11 +174,7 @@ router.post('/issue-credential', async (req, res) => {
       message: 'Credential issued successfully'
     });
   } catch (error) {
-    logger.error('Credential issuance error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -199,7 +182,7 @@ router.post('/issue-credential', async (req, res) => {
  * POST /api/v1/contracts/revoke-credential
  * Revoke credential on blockchain
  */
-router.post('/revoke-credential', async (req, res) => {
+router.post('/revoke-credential', async (req, res, next) => {
   try {
     const { credentialId, signerSecret } = req.body;
     
@@ -220,11 +203,7 @@ router.post('/revoke-credential', async (req, res) => {
       message: 'Credential revoked successfully'
     });
   } catch (error) {
-    logger.error('Credential revocation error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -232,7 +211,7 @@ router.post('/revoke-credential', async (req, res) => {
  * GET /api/v1/contracts/did/:did
  * Get DID document from blockchain
  */
-router.get('/did/:did', async (req, res) => {
+router.get('/did/:did', async (req, res, next) => {
   try {
     const { did } = req.params;
     
@@ -261,11 +240,7 @@ router.get('/did/:did', async (req, res) => {
       message: 'DID retrieved successfully'
     });
   } catch (error) {
-    logger.error('Get DID error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -273,7 +248,7 @@ router.get('/did/:did', async (req, res) => {
  * GET /api/v1/contracts/credential/:credentialId
  * Get credential from blockchain
  */
-router.get('/credential/:credentialId', async (req, res) => {
+router.get('/credential/:credentialId', async (req, res, next) => {
   try {
     const { credentialId } = req.params;
     
@@ -294,11 +269,7 @@ router.get('/credential/:credentialId', async (req, res) => {
       message: 'Credential retrieved successfully'
     });
   } catch (error) {
-    logger.error('Get credential error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -306,7 +277,7 @@ router.get('/credential/:credentialId', async (req, res) => {
  * GET /api/v1/contracts/owner-dids/:publicKey
  * Get all DIDs for an owner
  */
-router.get('/owner-dids/:publicKey', async (req, res) => {
+router.get('/owner-dids/:publicKey', async (req, res, next) => {
   try {
     const { publicKey } = req.params;
     
@@ -329,11 +300,7 @@ router.get('/owner-dids/:publicKey', async (req, res) => {
       message: 'Owner DIDs retrieved successfully'
     });
   } catch (error) {
-    logger.error('Get owner DIDs error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -341,7 +308,7 @@ router.get('/owner-dids/:publicKey', async (req, res) => {
  * POST /api/v1/contracts/verify-credential
  * Verify credential on blockchain
  */
-router.post('/verify-credential', async (req, res) => {
+router.post('/verify-credential', async (req, res, next) => {
   try {
     const { credentialId } = req.body;
     
@@ -364,11 +331,7 @@ router.post('/verify-credential', async (req, res) => {
         'Credential verification failed'
     });
   } catch (error) {
-    logger.error('Credential verification error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -376,7 +339,7 @@ router.post('/verify-credential', async (req, res) => {
  * GET /api/v1/contracts/info
  * Get contract information
  */
-router.get('/info', async (req, res) => {
+router.get('/info', async (req, res, next) => {
   try {
     logger.debug('Getting contract information');
     
@@ -388,11 +351,7 @@ router.get('/info', async (req, res) => {
       message: 'Contract information retrieved successfully'
     });
   } catch (error) {
-    logger.error('Get contract info error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -400,7 +359,7 @@ router.get('/info', async (req, res) => {
  * POST /api/v1/contracts/create-account
  * Create new Stellar account
  */
-router.post('/create-account', async (req, res) => {
+router.post('/create-account', async (req, res, next) => {
   try {
     logger.info('Creating new Stellar account');
     
@@ -412,11 +371,7 @@ router.post('/create-account', async (req, res) => {
       message: 'Account created successfully'
     });
   } catch (error) {
-    logger.error('Create account error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -424,7 +379,7 @@ router.post('/create-account', async (req, res) => {
  * POST /api/v1/contracts/fund-account
  * Fund testnet account
  */
-router.post('/fund-account', async (req, res) => {
+router.post('/fund-account', async (req, res, next) => {
   try {
     const { publicKey } = req.body;
     
@@ -445,11 +400,7 @@ router.post('/fund-account', async (req, res) => {
       message: 'Account funded successfully'
     });
   } catch (error) {
-    logger.error('Fund account error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
@@ -457,7 +408,7 @@ router.post('/fund-account', async (req, res) => {
  * GET /api/v1/contracts/account/:publicKey
  * Get account information
  */
-router.get('/account/:publicKey', async (req, res) => {
+router.get('/account/:publicKey', async (req, res, next) => {
   try {
     const { publicKey } = req.params;
     
@@ -471,12 +422,9 @@ router.get('/account/:publicKey', async (req, res) => {
       message: 'Account information retrieved successfully'
     });
   } catch (error) {
-    logger.error('Get account error:', error);
-    res.status(404).json({
-      success: false,
-      error: error.message
-    });
+    next(error);
   }
 });
 
 module.exports = router;
+

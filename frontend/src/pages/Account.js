@@ -171,11 +171,11 @@ const Account = () => {
                   <Button
                     variant="outlined"
                     fullWidth
-                    startIcon={<Refresh />}
+                    startIcon={loading ? <CircularProgress size={20} /> : <Refresh />}
                     onClick={() => accountInfo && fetchAccountInfo(accountInfo.accountId)}
-                    disabled={!accountInfo}
+                    disabled={!accountInfo || loading}
                   >
-                    Refresh Data
+                    {loading ? 'Refreshing...' : 'Refresh Data'}
                   </Button>
                 </Grid>
                 <Grid item xs={12}>
@@ -192,6 +192,18 @@ const Account = () => {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Loading State */}
+        {loading && !accountInfo && (
+          <Grid item xs={12}>
+            <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" p={5}>
+              <CircularProgress size={60} sx={{ mb: 2 }} />
+              <Typography variant="h6" color="text.secondary">
+                Fetching Account Data...
+              </Typography>
+            </Box>
+          </Grid>
+        )}
 
         {/* Account Information */}
         {accountInfo && (

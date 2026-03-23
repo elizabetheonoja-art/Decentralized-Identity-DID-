@@ -87,8 +87,12 @@ export const useWallet = () => {
         
         return walletData;
       }
+      throw new Error('Failed to create account');
     } catch (error) {
-      throw new Error('Failed to connect wallet');
+      toast.error(error.message || 'Failed to connect wallet');
+      throw error;
+    } finally {
+      setLoading(false);
     }
   }, []);
 

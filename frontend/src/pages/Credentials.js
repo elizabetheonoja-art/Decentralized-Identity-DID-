@@ -59,6 +59,7 @@ const Credentials = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const { wallet, isConnected } = useWallet();
 
   const issueForm = useForm({
@@ -83,11 +84,14 @@ const Credentials = () => {
   }, []);
 
   const fetchTemplates = async () => {
+    setTemplatesLoading(true);
     try {
       const response = await stellarAPI.credentials.getTemplates();
       setTemplates(response.data);
     } catch (err) {
       console.error('Failed to fetch templates:', err);
+    } finally {
+      setTemplatesLoading(false);
     }
   };
 
@@ -311,23 +315,29 @@ const Credentials = () => {
                     Click to use a template:
                   </Typography>
                   
-                  {templates.map((template) => (
-                    <Paper
-                      key={template.id}
-                      sx={{ p: 2, mb: 2, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
-                      onClick={() => useTemplate(template)}
-                    >
-                      <Box display="flex" alignItems="center" mb={1}>
-                        {getCredentialIcon(template.id)}
-                        <Typography variant="subtitle2" sx={{ ml: 1 }}>
-                          {template.name}
+                  {templatesLoading ? (
+                    <Box display="flex" justifyContent="center" p={3}>
+                      <CircularProgress size={30} />
+                    </Box>
+                  ) : (
+                    templates.map((template) => (
+                      <Paper
+                        key={template.id}
+                        sx={{ p: 2, mb: 2, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                        onClick={() => useTemplate(template)}
+                      >
+                        <Box display="flex" alignItems="center" mb={1}>
+                          {getCredentialIcon(template.id)}
+                          <Typography variant="subtitle2" sx={{ ml: 1 }}>
+                            {template.name}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {Object.keys(template.claims).join(', ')}
                         </Typography>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {Object.keys(template.claims).join(', ')}
-                      </Typography>
-                    </Paper>
-                  ))}
+                      </Paper>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </Grid>

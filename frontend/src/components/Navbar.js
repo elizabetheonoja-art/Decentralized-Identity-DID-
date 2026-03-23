@@ -31,7 +31,7 @@ const Navbar = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
-  const { wallet, isConnected, connectWallet, disconnectWallet } = useWallet();
+  const { wallet, isConnected, connectWallet, disconnectWallet, loading } = useWallet();
   const [anchorEl, setAnchorEl] = useState(null);
 
   const menuItems = [
@@ -102,13 +102,13 @@ const Navbar = () => {
                     variant="outlined"
                     sx={{ borderColor: 'white', color: 'white' }}
                   />
-                  <Button color="inherit" onClick={disconnectWallet} size="small">
+                  <Button color="inherit" onClick={disconnectWallet} size="small" disabled={loading}>
                     Disconnect
                   </Button>
                 </Box>
               ) : (
-                <Button color="inherit" onClick={connectWallet} variant="outlined">
-                  Connect Wallet
+                <Button color="inherit" onClick={connectWallet} variant="outlined" disabled={loading}>
+                  {loading ? 'Connecting...' : 'Connect Wallet'}
                 </Button>
               )}
               
@@ -167,8 +167,8 @@ const Navbar = () => {
                     </Typography>
                   </MenuItem>
                 ) : (
-                  <MenuItem onClick={connectWallet}>
-                    <Typography>Connect Wallet</Typography>
+                  <MenuItem onClick={connectWallet} disabled={loading}>
+                    <Typography>{loading ? 'Connecting...' : 'Connect Wallet'}</Typography>
                   </MenuItem>
                 )}
                 

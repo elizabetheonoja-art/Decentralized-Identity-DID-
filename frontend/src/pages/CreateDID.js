@@ -36,7 +36,7 @@ const CreateDID = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const { wallet, connectWallet, isConnected } = useWallet();
+  const { wallet, connectWallet, isConnected, loading: walletLoading } = useWallet();
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: yupResolver(schema),
@@ -81,14 +81,19 @@ const CreateDID = () => {
   };
 
   const handleCreateAccount = async () => {
+    setLoading(true);
     try {
       const response = await stellarAPI.post('/contracts/create-account');
       toast.success('New account created! Check console for details.');
       console.log('New Account:', response.data);
     } catch (err) {
       toast.error('Failed to create account');
+    } finally {
+      setLoading(false);
     }
   };
+
+
 
   return (
     <Box>
@@ -117,10 +122,11 @@ const CreateDID = () => {
                   <Button
                     variant="contained"
                     onClick={connectWallet}
-                    disabled={loading}
+                    disabled={loading || walletLoading}
                     fullWidth
+                    startIcon={walletLoading && <CircularProgress size={20} color="inherit" />}
                   >
-                    Connect Wallet
+                    {walletLoading ? 'Connecting...' : 'Connect Wallet'}
                   </Button>
                 </Box>
               ) : (
@@ -185,7 +191,7 @@ const CreateDID = () => {
                   type="submit"
                   variant="contained"
                   size="large"
-                  disabled={loading || !isConnected}
+                  disabled={loading || walletLoading || !isConnected}
                   fullWidth
                   sx={{ mt: 2 }}
                 >
@@ -198,10 +204,11 @@ const CreateDID = () => {
               <Button
                 variant="outlined"
                 onClick={handleCreateAccount}
-                startIcon={<Refresh />}
+                startIcon={loading ? <CircularProgress size={20} /> : <Refresh />}
+                disabled={loading || walletLoading}
                 fullWidth
               >
-                Create New Account
+                {loading ? 'Processing...' : 'Create New Account'}
               </Button>
             </CardContent>
           </Card>

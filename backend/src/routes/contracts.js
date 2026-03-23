@@ -36,10 +36,39 @@ const issueCredentialSchema = Joi.object({
 });
 
 /**
- * POST /api/v1/contracts/deploy
- * Deploy DID registry contract
+ * @openapi
+ * tags:
+ *   name: Contracts
+ *   description: Smart contract operations for DID and Credentials on Stellar
+ */
+
+/**
+ * @openapi
+ * /contracts/deploy:
+ *   post:
+ *     summary: Deploy DID registry contract
+ *     tags: [Contracts]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [deployerSecret]
+ *             properties:
+ *               deployerSecret:
+ *                 type: string
+ *                 description: Stellar secret key of the deployer
+ *     responses:
+ *       201:
+ *         description: Contract deployed successfully
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Server error
  */
 router.post('/deploy', async (req, res, next) => {
+  // ... (implementation remains the same)
   try {
     const { error, value } = deployContractSchema.validate(req.body);
     
@@ -68,8 +97,30 @@ router.post('/deploy', async (req, res, next) => {
 });
 
 /**
- * POST /api/v1/contracts/register-did
- * Register a new DID on the blockchain
+ * @openapi
+ * /contracts/register-did:
+ *   post:
+ *     summary: Register a new DID on the blockchain
+ *     tags: [Contracts]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [did, publicKey, signerSecret]
+ *             properties:
+ *               did:
+ *                 type: string
+ *               publicKey:
+ *                 type: string
+ *               serviceEndpoint:
+ *                 type: string
+ *               signerSecret:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: DID registered successfully
  */
 router.post('/register-did', async (req, res, next) => {
   try {
@@ -105,8 +156,14 @@ router.post('/register-did', async (req, res, next) => {
 });
 
 /**
- * PUT /api/v1/contracts/update-did
- * Update DID document on blockchain
+ * @openapi
+ * /contracts/update-did:
+ *   put:
+ *     summary: Update DID document on blockchain
+ *     tags: [Contracts]
+ *     responses:
+ *       200:
+ *         description: DID updated successfully
  */
 router.put('/update-did', async (req, res, next) => {
   try {
@@ -137,8 +194,14 @@ router.put('/update-did', async (req, res, next) => {
 });
 
 /**
- * POST /api/v1/contracts/issue-credential
- * Issue verifiable credential on blockchain
+ * @openapi
+ * /contracts/issue-credential:
+ *   post:
+ *     summary: Issue verifiable credential on blockchain
+ *     tags: [Contracts]
+ *     responses:
+ *       201:
+ *         description: Credential issued successfully
  */
 router.post('/issue-credential', async (req, res, next) => {
   try {
@@ -179,8 +242,14 @@ router.post('/issue-credential', async (req, res, next) => {
 });
 
 /**
- * POST /api/v1/contracts/revoke-credential
- * Revoke credential on blockchain
+ * @openapi
+ * /contracts/revoke-credential:
+ *   post:
+ *     summary: Revoke credential on blockchain
+ *     tags: [Contracts]
+ *     responses:
+ *       200:
+ *         description: Credential revoked successfully
  */
 router.post('/revoke-credential', async (req, res, next) => {
   try {
@@ -208,8 +277,22 @@ router.post('/revoke-credential', async (req, res, next) => {
 });
 
 /**
- * GET /api/v1/contracts/did/:did
- * Get DID document from blockchain
+ * @openapi
+ * /contracts/did/{did}:
+ *   get:
+ *     summary: Get DID document from blockchain
+ *     tags: [Contracts]
+ *     parameters:
+ *       - in: path
+ *         name: did
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: DID retrieved successfully
+ *       404:
+ *         description: DID not found
  */
 router.get('/did/:did', async (req, res, next) => {
   try {
@@ -245,8 +328,20 @@ router.get('/did/:did', async (req, res, next) => {
 });
 
 /**
- * GET /api/v1/contracts/credential/:credentialId
- * Get credential from blockchain
+ * @openapi
+ * /contracts/credential/{credentialId}:
+ *   get:
+ *     summary: Get credential from blockchain
+ *     tags: [Contracts]
+ *     parameters:
+ *       - in: path
+ *         name: credentialId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Credential retrieved successfully
  */
 router.get('/credential/:credentialId', async (req, res, next) => {
   try {
@@ -274,8 +369,20 @@ router.get('/credential/:credentialId', async (req, res, next) => {
 });
 
 /**
- * GET /api/v1/contracts/owner-dids/:publicKey
- * Get all DIDs for an owner
+ * @openapi
+ * /contracts/owner-dids/{publicKey}:
+ *   get:
+ *     summary: Get all DIDs for an owner
+ *     tags: [Contracts]
+ *     parameters:
+ *       - in: path
+ *         name: publicKey
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Owner DIDs retrieved successfully
  */
 router.get('/owner-dids/:publicKey', async (req, res, next) => {
   try {
@@ -305,8 +412,14 @@ router.get('/owner-dids/:publicKey', async (req, res, next) => {
 });
 
 /**
- * POST /api/v1/contracts/verify-credential
- * Verify credential on blockchain
+ * @openapi
+ * /contracts/verify-credential:
+ *   post:
+ *     summary: Verify credential on blockchain
+ *     tags: [Contracts]
+ *     responses:
+ *       200:
+ *         description: Credential verified successfully
  */
 router.post('/verify-credential', async (req, res, next) => {
   try {
@@ -336,8 +449,14 @@ router.post('/verify-credential', async (req, res, next) => {
 });
 
 /**
- * GET /api/v1/contracts/info
- * Get contract information
+ * @openapi
+ * /contracts/info:
+ *   get:
+ *     summary: Get contract information
+ *     tags: [Contracts]
+ *     responses:
+ *       200:
+ *         description: Contract information retrieved successfully
  */
 router.get('/info', async (req, res, next) => {
   try {
@@ -356,8 +475,14 @@ router.get('/info', async (req, res, next) => {
 });
 
 /**
- * POST /api/v1/contracts/create-account
- * Create new Stellar account
+ * @openapi
+ * /contracts/create-account:
+ *   post:
+ *     summary: Create new Stellar account
+ *     tags: [Contracts]
+ *     responses:
+ *       201:
+ *         description: Account created successfully
  */
 router.post('/create-account', async (req, res, next) => {
   try {
@@ -376,8 +501,14 @@ router.post('/create-account', async (req, res, next) => {
 });
 
 /**
- * POST /api/v1/contracts/fund-account
- * Fund testnet account
+ * @openapi
+ * /contracts/fund-account:
+ *   post:
+ *     summary: Fund testnet account
+ *     tags: [Contracts]
+ *     responses:
+ *       200:
+ *         description: Account funded successfully
  */
 router.post('/fund-account', async (req, res, next) => {
   try {
@@ -405,8 +536,20 @@ router.post('/fund-account', async (req, res, next) => {
 });
 
 /**
- * GET /api/v1/contracts/account/:publicKey
- * Get account information
+ * @openapi
+ * /contracts/account/{publicKey}:
+ *   get:
+ *     summary: Get account information
+ *     tags: [Contracts]
+ *     parameters:
+ *       - in: path
+ *         name: publicKey
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Account information retrieved successfully
  */
 router.get('/account/:publicKey', async (req, res, next) => {
   try {
@@ -425,6 +568,9 @@ router.get('/account/:publicKey', async (req, res, next) => {
     next(error);
   }
 });
+
+module.exports = router;
+
 
 module.exports = router;
 

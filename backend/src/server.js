@@ -16,6 +16,8 @@ const contractRoutes = require('./routes/contracts');
 const authRoutes = require('./routes/auth');
 const { logger, errorHandler } = require('./middleware');
 const { connectDatabase } = require('./utils/database');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 
 // Initialize Express app
 const app = express();
@@ -63,6 +65,10 @@ app.use('/api/v1/credentials', credentialRoutes);
 app.use('/api/v1/contracts', contractRoutes);
 app.use('/api/v1/auth', authRoutes);
 
+// Swagger Documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+
 // API documentation endpoint
 app.get('/api', (req, res) => {
   res.json({
@@ -79,6 +85,7 @@ app.get('/api', (req, res) => {
     documentation: '/api/docs'
   });
 });
+
 
 // 404 handler
 app.use('*', (req, res) => {

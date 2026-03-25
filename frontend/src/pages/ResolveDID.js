@@ -155,7 +155,7 @@ const ResolveDID = () => {
                     onKeyPress={(e) => { if (e.key === 'Enter') reset({ did }); }}
                     aria-label={`Example DID: ${did}`}
                   >
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {did}
                     </Typography>
                   </Paper>

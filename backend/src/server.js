@@ -1,10 +1,10 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-const dotenv = require('dotenv');
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
+const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
+const dotenv = require("dotenv");
 
 // Load environment variables
 dotenv.config();
@@ -34,51 +34,57 @@ app.use(compression());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === "test" ? 100000 : 100, // disable in test
 });
-app.use('/api', limiter);
+app.use("/api", limiter);
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
+  }),
+);
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Logging
-app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+app.use(
+  morgan("combined", {
+    stream: { write: (message) => logger.info(message.trim()) },
+  }),
+);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get("/health", (req, res) => {
   res.json({
-    status: 'healthy',
-    service: 'stellar-did-backend',
-    version: '1.0.0',
-    network: process.env.STELLAR_NETWORK || 'TESTNET',
+    status: "healthy",
+    service: "stellar-did-backend",
+    version: "1.0.0",
+    network: process.env.STELLAR_NETWORK || "TESTNET",
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
 });
 
 // API routes
-app.use('/api/v1/did', didRoutes);
-app.use('/api/v1/credentials', credentialRoutes);
-app.use('/api/v1/contracts', contractRoutes);
-app.use('/api/v1/auth', authRoutes);
+app.use("/api/v1/did", didRoutes);
+app.use("/api/v1/credentials", credentialRoutes);
+app.use("/api/v1/contracts", contractRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/qr", qrRoutes);
 
 // Swagger Documentation
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API documentation endpoint
-app.get('/api', (req, res) => {
+app.get("/api", (req, res) => {
   res.json({
-    name: 'Stellar DID Backend API',
-    version: '1.0.0',
-    description: 'Backend microservice for Stellar DID Platform',
+    name: "Stellar DID Backend API",
+    version: "1.0.0",
+    description: "Backend microservice for Stellar DID Platform",
     endpoints: {
       did: '/api/v1/did',
       credentials: '/api/v1/credentials',
@@ -92,14 +98,13 @@ app.get('/api', (req, res) => {
   });
 });
 
-
 // 404 handler
-app.use('*', (req, res) => {
+app.use("*", (req, res) => {
   res.status(404).json({
     success: false,
-    error: 'Not Found',
-    message: 'The requested endpoint was not found',
-    path: req.originalUrl
+    error: "Not Found",
+    message: "The requested endpoint was not found",
+    path: req.originalUrl,
   });
 });
 
@@ -107,13 +112,13 @@ app.use('*', (req, res) => {
 app.use(errorHandler);
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM received, shutting down gracefully");
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
+process.on("SIGINT", () => {
+  logger.info("SIGINT received, shutting down gracefully");
   process.exit(0);
 });
 
@@ -136,7 +141,7 @@ async function startServer() {
     logger.info(`📚 Health: http://localhost:${PORT}/health`);
     logger.info(`📖 Documentation: http://localhost:${PORT}/api/docs`);
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    logger.error("Failed to start server:", error);
     process.exit(1);
   }
 }

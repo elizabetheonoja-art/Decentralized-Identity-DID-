@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -13,23 +13,27 @@ import {
   IconButton,
   Tooltip,
   Chip,
-  Grid
-} from '@mui/material';
+  Grid,
+  Modal,
+} from "@mui/material";
 import {
   Search,
   ContentCopy,
   AccountBalance,
   VerifiedUser,
   Schedule,
-  Info
-} from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
-import { toast } from 'react-toastify';
-import { stellarAPI } from '../services/api';
-import { handleApiError } from '../utils/errorHandler';
-import ErrorDisplay from '../components/ErrorDisplay';
+  Info,
+  QrCodeScanner,
+  Close,
+} from "@mui/icons-material";
+import { useForm, Controller } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { toast } from "react-toastify";
+import { stellarAPI } from "../services/api";
+import { handleApiError } from "../utils/errorHandler";
+import ErrorDisplay from "../components/ErrorDisplay";
+import QRScanner from "../components/QRScanner";
 
 const schema = yup.object().shape({
   did: yup.string()
@@ -41,24 +45,30 @@ const ResolveDID = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm({
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
-      did: '',
+      did: "",
     },
   });
 
   const handleResolveDID = async (data) => {
     setLoading(true);
-    setError('');
+    setError("");
     setResult(null);
 
     try {
       const response = await stellarAPI.contracts.getDID(data.did);
-      
+
       setResult(response.data);
-      toast.success('DID resolved successfully!');
+      toast.success("DID resolved successfully!");
     } catch (err) {
       const errorInfo = handleApiError(err);
       setError(errorInfo);
@@ -70,7 +80,14 @@ const ResolveDID = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard!');
+    toast.success("Copied to clipboard!");
+  };
+
+  const handleScanResult = (payload) => {
+    setScannerOpen(false);
+    if (payload?.did) {
+      reset({ did: payload.did });
+    }
   };
 
   const formatDate = (dateString) => {
@@ -228,9 +245,9 @@ const ResolveDID = () => {
                       <Typography variant="subtitle2" color="text.secondary" gutterBottom id="status-label">
                         Status
                       </Typography>
-                      <Chip 
-                        label={result.active ? 'Active' : 'Inactive'}
-                        color={result.active ? 'success' : 'error'}
+                      <Chip
+                        label={result.active ? "Active" : "Inactive"}
+                        color={result.active ? "success" : "error"}
                         size="small"
                         aria-label={`Status: ${result.active ? 'Active' : 'Inactive'}`}
                       />
@@ -320,13 +337,37 @@ const ResolveDID = () => {
         {/* Error Display */}
         {error && (
           <Grid item xs={12}>
-            <ErrorDisplay 
-              error={error} 
-              onClose={() => setError(null)} 
-            />
+            <ErrorDisplay error={error} onClose={() => setError(null)} />
           </Grid>
         )}
       </Grid>
+
+      {/* QR Scanner Modal */}
+      <Modal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        aria-label="QR code scanner modal"
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: { xs: "95vw", sm: 480 },
+            bgcolor: "background.paper",
+            borderRadius: 2,
+            boxShadow: 24,
+            p: 2,
+          }}
+        >
+          <QRScanner
+            allowedTypes={["did"]}
+            onScan={handleScanResult}
+            onClose={() => setScannerOpen(false)}
+          />
+        </Box>
+      </Modal>
     </Box>
   );
 };

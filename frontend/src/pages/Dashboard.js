@@ -38,6 +38,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [isConnected]);
 
   const fetchDashboardData = async () => {
@@ -80,7 +86,11 @@ const Dashboard = () => {
       <Typography variant="h4" gutterBottom fontWeight="bold">
         Stellar DID Platform Dashboard
       </Typography>
-      
+      <Box display="flex" justifyContent="flex-end" mb={2}>
+  <Button variant="outlined" onClick={fetchDashboardData} startIcon={<TrendingUp />}>
+    Refresh
+  </Button>
+</Box>
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} role="alert">
           {error}

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { handleApiError } from '../utils/errorHandler';
+import secureStorage from '../utils/secureStorage';
 
 const WalletContext = createContext(null);
 
@@ -11,15 +12,21 @@ export const WalletProvider = ({ children }) => {
 
   // Check if wallet is connected on mount
   useEffect(() => {
-    const savedWallet = localStorage.getItem('stellarWallet');
+    const savedWallet = secureStorage.getWalletData();
     if (savedWallet) {
       try {
-        const walletData = JSON.parse(savedWallet);
+        // Restore private key from memory if available
+        const privateKey = secureStorage.getPrivateKey();
+        const walletData = {
+          ...savedWallet,
+          // Note: secretKey is retrieved from memory, not storage
+          ...(privateKey && { secretKey: privateKey }),
+        };
         setWallet(walletData);
         setIsConnected(true);
       } catch (error) {
-        console.error('Failed to parse saved wallet:', error);
-        localStorage.removeItem('stellarWallet');
+        console.error('Failed to restore wallet:', error);
+        secureStorage.clearSensitiveData();
       }
     }
   }, []);
@@ -40,7 +47,8 @@ export const WalletProvider = ({ children }) => {
         
         setWallet(walletData);
         setIsConnected(true);
-        localStorage.setItem('stellarWallet', JSON.stringify(walletData));
+        // Store wallet data securely (without private keys)
+        secureStorage.setWalletData(walletData);
         toast.success('Wallet connected with Freighter!');
         return walletData;
       }
@@ -60,16 +68,24 @@ export const WalletProvider = ({ children }) => {
       const result = await response.json();
       
       if (result.success) {
+        const { secretKey, ...publicWalletData } = result.data;
+        
         const walletData = {
           publicKey: result.data.publicKey,
-          secretKey: result.data.secretKey,
           type: 'generated',
           connectedAt: new Date().toISOString(),
         };
         
-        setWallet(walletData);
+        // Store private key in memory only (not persisted to storage)
+        secureStorage.setPrivateKey(secretKey);
+        // Store public wallet data in secure session storage
+        secureStorage.setWalletData(walletData);
+        
+        setWallet({
+          ...walletData,
+          secretKey, // Keep in memory for this session only
+        });
         setIsConnected(true);
-        localStorage.setItem('stellarWallet', JSON.stringify(walletData));
         toast.success('New wallet created and connected!');
         
         // Auto-fund testnet account
@@ -104,7 +120,9 @@ export const WalletProvider = ({ children }) => {
   const disconnectWallet = useCallback(() => {
     setWallet(null);
     setIsConnected(false);
-    localStorage.removeItem('stellarWallet');
+    // Clear all sensitive data from secure storage on disconnect
+    secureStorage.removeSessionData('walletData');
+    secureStorage.removePrivateKey();
     toast.info('Wallet disconnected');
   }, []);
 
@@ -134,7 +152,14 @@ export const WalletProvider = ({ children }) => {
       if (wallet.type === 'freighter') {
         const signedXDR = await window.freighter.signTransaction(transactionXDR);
         return signedXDR;
-      } else if (wallet.secretKey) {
+      } else {
+        // Retrieve private key from memory (not from storage)
+        const secretKey = secureStorage.getPrivateKey() || wallet.secretKey;
+        
+        if (!secretKey) {
+          throw new Error('Private key not available. Please reconnect your wallet.');
+        }
+        
         const response = await fetch('http://localhost:3001/api/v1/contracts/sign-transaction', {
           method: 'POST',
           headers: {
@@ -142,7 +167,7 @@ export const WalletProvider = ({ children }) => {
           },
           body: JSON.stringify({
             transactionXDR,
-            secretKey: wallet.secretKey,
+            secretKey,
           }),
         });
         

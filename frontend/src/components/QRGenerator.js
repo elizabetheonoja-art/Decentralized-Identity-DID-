@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import QRCode from "qrcode";
 import {
   Box,
@@ -45,13 +45,31 @@ function getPayloadId(payload) {
  *   payload  — QRPayload object to encode
  *   size     — canvas size in px (default 256, minimum 256)
  */
-const QRGenerator = ({ payload, size = MIN_SIZE }) => {
+const QRGenerator = React.memo(({ payload, size = MIN_SIZE }) => {
   const canvasRef = useRef(null);
   const [deepLink, setDeepLink] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const effectiveSize = Math.max(size, MIN_SIZE);
+  const effectiveSize = useMemo(() => Math.max(size, MIN_SIZE), [size]);
+
+  // Memoize the label to prevent recalculations
+  const label = useMemo(
+    () => (payload
+      ? `${payload.type}: ${truncate(getPayloadId(payload))}`
+      : ""),
+    [payload]
+  );
+
+  // Memoize download handler
+  const handleDownload = useCallback(() => {
+    if (!canvasRef.current) return;
+    const url = canvasRef.current.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `qr-${payload?.type || "code"}.png`;
+    a.click();
+  }, [payload]);
 
   useEffect(() => {
     if (!payload) return;
@@ -86,19 +104,6 @@ const QRGenerator = ({ payload, size = MIN_SIZE }) => {
       cancelled = true;
     };
   }, [payload, effectiveSize]);
-
-  const handleDownload = () => {
-    if (!canvasRef.current) return;
-    const url = canvasRef.current.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `qr-${payload?.type || "code"}.png`;
-    a.click();
-  };
-
-  const label = payload
-    ? `${payload.type}: ${truncate(getPayloadId(payload))}`
-    : "";
 
   return (
     <Box

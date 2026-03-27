@@ -16,6 +16,7 @@ const contractRoutes = require('./routes/contracts');
 const authRoutes = require('./routes/auth');
 const { logger, errorHandler } = require('./middleware');
 const { connectDatabase } = require('./utils/database');
+const { sanitizeQuery } = require('./middleware/inputValidation');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const GraphQLServer = require('./graphql/server');
@@ -50,6 +51,9 @@ app.use(
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Input sanitization middleware
+app.use(sanitizeQuery);
 
 // Logging
 app.use(

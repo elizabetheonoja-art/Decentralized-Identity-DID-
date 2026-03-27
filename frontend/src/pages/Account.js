@@ -60,31 +60,46 @@ const Account = () => {
   });
 
   useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+
     if (wallet?.publicKey) {
       reset({ publicKey: wallet.publicKey });
-      fetchAccountInfo(wallet.publicKey);
+      fetchAccountInfo(wallet.publicKey, abortController, isMounted);
     }
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [wallet, reset]);
 
-  const fetchAccountInfo = async (publicKey) => {
+  const fetchAccountInfo = async (publicKey, abortController, isMounted) => {
+    if (!isMounted) return;
+    
     setLoading(true);
     setError('');
 
     try {
       const response = await stellarAPI.contracts.getAccount(publicKey);
+      if (!isMounted) return;
+      
       setAccountInfo(response.data);
       
       // Fetch recent transactions
       const txResponse = await stellarAPI.did.getTransactions(publicKey, { limit: 10 });
+      if (!isMounted) return;
+      
       setTransactions(txResponse.data.transactions || []);
       
-      toast.success('Account information loaded!');
+      if (isMounted) toast.success('Account information loaded!');
     } catch (err) {
+      if (!isMounted) return;
       const errorInfo = handleApiError(err);
       setError(errorInfo);
       toast.error(errorInfo.message);
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
   };
 

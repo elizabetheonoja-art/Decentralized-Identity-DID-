@@ -49,21 +49,35 @@ const Contracts = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchContractInfo();
+    let isMounted = true;
+    const abortController = new AbortController();
+
+    fetchContractInfo(abortController, isMounted);
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, []);
 
-  const fetchContractInfo = async () => {
+  const fetchContractInfo = async (abortController, isMounted) => {
+    if (!isMounted) return;
+    
     setLoading(true);
     setError('');
 
     try {
       const response = await stellarAPI.contracts.getInfo();
+      
+      if (!isMounted) return; // Check if component is still mounted
+      
       setContractInfo(response.data);
     } catch (err) {
+      if (!isMounted) return;
       const errorInfo = handleApiError(err);
       setError(errorInfo);
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
   };
 

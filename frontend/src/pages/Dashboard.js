@@ -37,22 +37,39 @@ const Dashboard = () => {
   const { wallet, isConnected } = useWallet();
 
   useEffect(() => {
-    fetchDashboardData();
+    let interval = null;
+    let isMounted = true;
+    const abortController = new AbortController();
 
-    const interval = setInterval(() => {
-      fetchDashboardData();
-    }, 30000);
+    const initDashboard = async () => {
+      await fetchDashboardData(abortController, isMounted);
+      // Set up interval for periodic updates
+      interval = setInterval(() => {
+        fetchDashboardData(abortController, isMounted);
+      }, 30000);
+    };
 
-    return () => clearInterval(interval);
+    initDashboard();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+      if (interval) clearInterval(interval);
+    };
   }, [isConnected]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (abortController, isMounted) => {
+    if (!isMounted) return;
+    
     setLoading(true);
     setError('');
 
     try {
       // Fetch contract info and stats
       const contractInfo = await stellarAPI.contracts.getInfo();
+      
+      if (!isMounted) return; // Check if component is still mounted
+      
       setStats({
         totalDIDs: Math.floor(Math.random() * 1000) + 100,
         totalCredentials: Math.floor(Math.random() * 5000) + 500,
@@ -64,9 +81,10 @@ const Dashboard = () => {
         avgResponseTime: '245ms'
       });
     } catch (err) {
+      if (!isMounted) return;
       setError('Failed to load dashboard data');
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
   };
 

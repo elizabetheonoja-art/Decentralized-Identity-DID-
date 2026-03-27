@@ -24,6 +24,7 @@ const SCANNER_ID = "qr-scanner-viewfinder";
  */
 const QRScanner = ({ onScan, onError, onClose, allowedTypes }) => {
   const scannerRef = useRef(null);
+  const isMountedRef = useRef(true);
   const [scanning, setScanning] = useState(false);
   const [cameras, setCameras] = useState([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
@@ -40,32 +41,32 @@ const QRScanner = ({ onScan, onError, onClose, allowedTypes }) => {
 
     Html5Qrcode.getCameras()
       .then((devices) => {
-        if (cancelled) return;
+        if (cancelled || !isMountedRef.current) return;
         if (!devices || devices.length === 0) {
-          setNoCamera(true);
+          if (isMountedRef.current) setNoCamera(true);
           return;
         }
-        setCameras(devices);
-        // Auto-start scanning
-        startScanner(devices, 0);
+        if (isMountedRef.current) setCameras(devices);
+        // Auto-start scanning only if component is still mounted
+        if (isMountedRef.current) startScanner(devices, 0);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || !isMountedRef.current) return;
         const msg = err?.message || String(err);
         if (
           msg.toLowerCase().includes("permission") ||
           msg.toLowerCase().includes("denied") ||
           msg.toLowerCase().includes("notallowed")
         ) {
-          setPermissionDenied(true);
+          if (isMountedRef.current) setPermissionDenied(true);
         } else if (
           msg.toLowerCase().includes("no camera") ||
           msg.toLowerCase().includes("notfound") ||
           msg.toLowerCase().includes("devicenotfound")
         ) {
-          setNoCamera(true);
+          if (isMountedRef.current) setNoCamera(true);
         } else {
-          setError("Unable to access camera: " + msg);
+          if (isMountedRef.current) setError("Unable to access camera: " + msg);
         }
         if (onError) onError(new Error(msg));
       });
@@ -75,6 +76,14 @@ const QRScanner = ({ onScan, onError, onClose, allowedTypes }) => {
       stopScanner();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mark component as unmounted on cleanup
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      stopScanner();
+    };
   }, []);
 
   const startScanner = useCallback(
@@ -91,8 +100,11 @@ const QRScanner = ({ onScan, onError, onClose, allowedTypes }) => {
           .stop()
           .catch(() => {})
           .finally(() => {
-            scannerRef.current.clear();
-            scannerRef.current = null;
+            // Check if scanner still exists before clearing
+            if (scannerRef.current) {
+              scannerRef.current.clear();
+              scannerRef.current = null;
+            }
             createAndStart(cameraId);
           });
       } else {
@@ -118,11 +130,13 @@ const QRScanner = ({ onScan, onError, onClose, allowedTypes }) => {
         () => {}, // ignore per-frame errors
       )
       .then(() => {
+        if (!isMountedRef.current) return;
         setScanning(true);
         setStreamInterrupted(false);
         setError(null);
       })
       .catch((err) => {
+        if (!isMountedRef.current) return;
         const msg = err?.message || String(err);
         if (
           msg.toLowerCase().includes("permission") ||
@@ -144,11 +158,14 @@ const QRScanner = ({ onScan, onError, onClose, allowedTypes }) => {
         .stop()
         .catch(() => {})
         .finally(() => {
-          if (scannerRef.current) {
+          // Check if scanner still exists and component is mounted
+          if (scannerRef.current && isMountedRef.current) {
             scannerRef.current.clear();
             scannerRef.current = null;
           }
-          setScanning(false);
+          if (isMountedRef.current) {
+            setScanning(false);
+          }
         });
     }
   }, []);

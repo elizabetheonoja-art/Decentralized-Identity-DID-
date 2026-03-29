@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Alert,
   AlertTitle,
@@ -20,10 +20,13 @@ import {
   Info
 } from '@mui/icons-material';
 
-const ErrorDisplay = ({ error, onClose, severity = 'error' }) => {
+const ErrorDisplay = React.memo(({ error, onClose, severity = 'error' }) => {
   const [expanded, setExpanded] = useState(false);
   
   if (!error) return null;
+  
+  // Memoize error info to prevent recalculations
+  const memoizedErrorInfo = useMemo(() => ({ ...error }), [error]);
   
   const errorInfo = error;
   const hasSuggestions = errorInfo.suggestions && errorInfo.suggestions.length > 0;
@@ -121,6 +124,17 @@ const ErrorDisplay = ({ error, onClose, severity = 'error' }) => {
       </Collapse>
     </Alert>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for React.memo
+  // Return true if props are equal (skip re-render)
+  return (
+    prevProps.severity === nextProps.severity &&
+    prevProps.onClose === nextProps.onClose &&
+    prevProps.error?.message === nextProps.error?.message &&
+    JSON.stringify(prevProps.error?.suggestions) === JSON.stringify(nextProps.error?.suggestions)
+  );
+});
+
+ErrorDisplay.displayName = 'ErrorDisplay';
 
 export default ErrorDisplay;

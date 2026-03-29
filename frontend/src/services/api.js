@@ -1,8 +1,9 @@
 import axios from "axios";
+import secureStorage from "../utils/secureStorage";
 
 // Create axios instance with default configuration
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:3001/api/v1";
+  process.env.REACT_APP_API_URL || "/api/v1";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -15,7 +16,7 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("authToken");
+    const token = secureStorage.getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -34,7 +35,7 @@ api.interceptors.response.use(
   (error) => {
     // Handle common errors
     if (error.response?.status === 401) {
-      localStorage.removeItem("authToken");
+      secureStorage.removeAuthToken();
       window.location.href = "/login";
     }
 
@@ -103,19 +104,19 @@ export const stellarAPI = {
 
 // Health check
 export const healthCheck = () =>
-  api.get("/health", { baseURL: "http://localhost:3001" });
+  api.get("/health");
 
 // Utility functions
 export const setAuthToken = (token) => {
-  localStorage.setItem("authToken", token);
+  secureStorage.setAuthToken(token);
 };
 
 export const removeAuthToken = () => {
-  localStorage.removeItem("authToken");
+  secureStorage.removeAuthToken();
 };
 
 export const getAuthToken = () => {
-  return localStorage.getItem("authToken");
+  return secureStorage.getAuthToken();
 };
 
 // Error handling utility

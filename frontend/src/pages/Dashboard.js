@@ -7,7 +7,6 @@ import {
   Grid,
   Paper,
   LinearProgress,
-  Alert,
   Button,
   Chip,
   List,
@@ -29,30 +28,49 @@ import {
 } from '@mui/icons-material';
 import { stellarAPI } from '../services/api';
 import { useWallet } from '../contexts/WalletContext';
+import { handleApiError } from '../utils/errorHandler';
+import ErrorDisplay from '../components/ErrorDisplay';
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const { wallet, isConnected } = useWallet();
 
   useEffect(() => {
-    fetchDashboardData();
+    let interval = null;
+    let isMounted = true;
+    const abortController = new AbortController();
 
-    const interval = setInterval(() => {
-      fetchDashboardData();
-    }, 30000);
+    const initDashboard = async () => {
+      await fetchDashboardData(abortController, isMounted);
+      // Set up interval for periodic updates
+      interval = setInterval(() => {
+        fetchDashboardData(abortController, isMounted);
+      }, 30000);
+    };
 
-    return () => clearInterval(interval);
+    initDashboard();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+      if (interval) clearInterval(interval);
+    };
   }, [isConnected]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (abortController, isMounted = true) => {
+    if (!isMounted) return;
+
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
       // Fetch contract info and stats
       const contractInfo = await stellarAPI.contracts.getInfo();
+      
+      if (!isMounted) return; // Check if component is still mounted
+      
       setStats({
         totalDIDs: Math.floor(Math.random() * 1000) + 100,
         totalCredentials: Math.floor(Math.random() * 5000) + 500,
@@ -64,9 +82,10 @@ const Dashboard = () => {
         avgResponseTime: '245ms'
       });
     } catch (err) {
-      setError('Failed to load dashboard data');
+      if (!isMounted) return;
+      setError(handleApiError(err));
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
   };
 
@@ -92,9 +111,7 @@ const Dashboard = () => {
   </Button>
 </Box>
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} role="alert">
-          {error}
-        </Alert>
+        <ErrorDisplay error={error} onClose={() => setError(null)} />
       )}
 
       {stats && (

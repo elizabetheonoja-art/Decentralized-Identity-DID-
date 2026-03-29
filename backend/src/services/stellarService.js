@@ -2,6 +2,28 @@ const { Server, Networks, TransactionBuilder, Operation, Asset } = require('stel
 const { logger } = require('../middleware');
 const redis = require('../utils/redis');
 
+// Custom error classes for better error handling
+class TransactionFailedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'TransactionFailed';
+  }
+}
+
+class AccountNotFoundError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'AccountNotFound';
+  }
+}
+
+class NetworkError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
 class StellarService {
   constructor() {
     this.server = new Server(process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org');
@@ -55,7 +77,7 @@ class StellarService {
       return accountData;
     } catch (error) {
       logger.error('Error fetching Stellar account:', error);
-      throw new Error('Failed to fetch Stellar account');
+      throw this.handleStellarError(error, 'Failed to fetch Stellar account');
     }
   }
 
@@ -74,7 +96,7 @@ class StellarService {
       return accounts;
     } catch (error) {
       logger.error('Error fetching Stellar accounts:', error);
-      throw error;
+      throw this.handleStellarError(error, 'Failed to fetch Stellar accounts');
     }
   }
 
@@ -114,7 +136,7 @@ class StellarService {
       return transactionData;
     } catch (error) {
       logger.error('Error fetching Stellar transaction:', error);
-      throw new Error('Failed to fetch Stellar transaction');
+      throw this.handleStellarError(error, 'Failed to fetch Stellar transaction');
     }
   }
 
@@ -170,7 +192,7 @@ class StellarService {
       }));
     } catch (error) {
       logger.error('Error fetching Stellar transactions:', error);
-      throw new Error('Failed to fetch Stellar transactions');
+      throw this.handleStellarError(error, 'Failed to fetch Stellar transactions');
     }
   }
 
@@ -183,7 +205,7 @@ class StellarService {
       return 0;
     } catch (error) {
       logger.error('Error fetching transaction count:', error);
-      throw error;
+      throw this.handleStellarError(error, 'Failed to fetch transaction count');
     }
   }
 
@@ -255,7 +277,7 @@ class StellarService {
       };
     } catch (error) {
       logger.error('Error creating Stellar transaction:', error);
-      throw new Error('Failed to create Stellar transaction');
+      throw this.handleStellarError(error, 'Failed to create Stellar transaction');
     }
   }
 
@@ -287,7 +309,7 @@ class StellarService {
       return transactionData;
     } catch (error) {
       logger.error('Error submitting Stellar transaction:', error);
-      throw new Error('Failed to submit Stellar transaction');
+      throw this.handleStellarError(error, 'Failed to submit Stellar transaction');
     }
   }
 
@@ -307,7 +329,7 @@ class StellarService {
       };
     } catch (error) {
       logger.error('Error fetching network stats:', error);
-      throw new Error('Failed to fetch network statistics');
+      throw this.handleStellarError(error, 'Failed to fetch network statistics');
     }
   }
 
@@ -376,6 +398,62 @@ class StellarService {
     } catch (error) {
       logger.error('Error publishing transaction event:', error);
     }
+  }
+
+  handleStellarError(error, defaultMessage) {
+    if (error.response) {
+      const status = error.response.status;
+      const data = error.response.data || {};
+      
+      if (status === 404) {
+        return new AccountNotFoundError('Account not found on the Stellar network');
+      }
+      
+      if (status === 400 || status === 403 || status === 504) {
+        let errorMsg = defaultMessage;
+        
+        if (data.extras && data.extras.result_codes) {
+          const codes = data.extras.result_codes;
+          
+          if (codes.transaction === 'tx_bad_seq') {
+            errorMsg = 'bad_sequence: Transaction has a bad sequence number';
+          } else if (codes.transaction === 'tx_insufficient_balance' || (codes.operations && codes.operations.includes('op_underfunded'))) {
+            errorMsg = 'insufficient balance to complete this operation';
+          } else {
+             let messages = [];
+             if (data.title) messages.push(data.title);
+             if (data.detail) messages.push(data.detail);
+             let codesStr = [];
+             if (codes.transaction) codesStr.push(`Transaction: ${codes.transaction}`);
+             if (codes.operations && codes.operations.length > 0) {
+               codesStr.push(`Operations: ${codes.operations.join(', ')}`);
+             }
+             if (codesStr.length > 0) {
+               messages.push(`Result Codes: [${codesStr.join(' | ')}]`);
+             }
+             if (messages.length > 0) {
+               errorMsg = messages.join('. ');
+             }
+          }
+        }
+        return new TransactionFailedError(errorMsg);
+      }
+      
+      if (status >= 500) {
+        return new NetworkError('Stellar network is currently experiencing issues');
+      }
+    }
+
+    if (error.message) {
+      if (error.message.includes('Network Error') || error.message.includes('timeout')) {
+        return new NetworkError('timeout: Connection to Stellar network failed');
+      }
+      if (!error.message.includes('Request failed with status code')) {
+        return new Error(`${defaultMessage}: ${error.message}`);
+      }
+    }
+
+    return new Error(defaultMessage);
   }
 }
 

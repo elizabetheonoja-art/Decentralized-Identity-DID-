@@ -78,7 +78,7 @@ pub struct DIDContract;
 #[contractimpl]
 impl DIDContract {
     /// Initialize the contract with version and network
-    pub fn __init__(env: Env, version: String, network: String, owner: Address) {
+     pub fn __constructor(env: Env, version: String, network: String, owner: Address) {
         let info = ContractInfo {
             version,
             network,

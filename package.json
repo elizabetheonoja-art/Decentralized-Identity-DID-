@@ -1,0 +1,56 @@
+{
+  "name": "decentralized-identity-did-test-suite",
+  "version": "1.0.0",
+  "description": "Comprehensive test suite for Decentralized Identity DID contracts",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx hardhat test",
+    "test:coverage": "npx hardhat coverage",
+    "test:unit": "npx hardhat test test/*.test.js",
+    "test:integration": "npx hardhat test test/Integration.test.js",
+    "test:security": "npx hardhat test test/Security.test.js",
+    "test:edgecases": "npx hardhat test test/EdgeCases.test.js",
+    "test:report": "npx hardhat test --reporter spec --reporter-file test-results.txt",
+    "compile": "npx hardhat compile",
+    "clean": "npx hardhat clean",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+    "node": "npx hardhat node"
+  },
+  "keywords": [
+    "blockchain",
+    "ethereum",
+    "solidity",
+    "did",
+    "decentralized-identity",
+    "smart-contracts",
+    "hardhat",
+    "testing"
+  ],
+  "author": "Fatima Sanusi",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@nomicfoundation/hardhat-verify": "^1.0.0",
+    "@typechain/ethers-v6": "^0.4.0",
+    "@typechain/hardhat": "^8.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "chai": "^4.2.0",
+    "ethers": "^6.4.0",
+    "hardhat": "^2.17.1",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": ">=8.0.0",
+    "typechain": "^8.3.0",
+    "typescript": ">=4.5.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

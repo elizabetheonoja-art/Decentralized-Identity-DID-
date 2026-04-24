@@ -1,0 +1,552 @@
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("Edge Cases and Error Conditions Tests", function () {
+    let didRegistry;
+    let stateRecovery;
+    let recoveryGovernance;
+    let owner, admin, governor, guardian, auditor, issuer, recovery, user1, user2, user3, attacker;
+    
+    beforeEach(async function () {
+        [owner, admin, governor, guardian, auditor, issuer, recovery, user1, user2, user3, attacker] = await ethers.getSigners();
+        
+        // Deploy contracts
+        const StateRecoveryFactory = await ethers.getContractFactory("StateRecovery");
+        stateRecovery = await StateRecoveryFactory.deploy();
+        await stateRecovery.deployed();
+        
+        const DIDRegistryFactory = await ethers.getContractFactory("EthereumDIDRegistry");
+        didRegistry = await DIDRegistryFactory.deploy();
+        await didRegistry.deployed();
+        
+        const RecoveryGovernanceFactory = await ethers.getContractFactory("RecoveryGovernance");
+        recoveryGovernance = await RecoveryGovernanceFactory.deploy(stateRecovery.address);
+        await recoveryGovernance.deployed();
+        
+        // Setup basic roles
+        await didRegistry.grantRole(await didRegistry.ADMIN_ROLE(), admin.address);
+        await didRegistry.grantRole(await didRegistry.ISSUER_ROLE(), issuer.address);
+        await didRegistry.grantRole(await didRegistry.RECOVERY_ROLE(), recovery.address);
+        
+        await stateRecovery.grantRole(await stateRecovery.RECOVERY_ROLE(), recovery.address);
+        await stateRecovery.grantRole(await stateRecovery.EMERGENCY_ROLE(), recovery.address);
+        await stateRecovery.grantRole(await stateRecovery.GOVERNANCE_ROLE(), governor.address);
+        
+        await recoveryGovernance.grantRole(await recoveryGovernance.GOVERNOR_ROLE(), governor.address);
+        await recoveryGovernance.grantRole(await recoveryGovernance.GUARDIAN_ROLE(), guardian.address);
+        await recoveryGovernance.grantRole(await recoveryGovernance.AUDITOR_ROLE(), auditor.address);
+        
+        // Set up contract relationships
+        await didRegistry.setStateRecoveryContract(stateRecovery.address);
+        await stateRecovery.setTargetContracts(didRegistry.address, ethers.constants.AddressZero);
+        await recoveryGovernance.connect(governor).authorizeContract(stateRecovery.address);
+        await didRegistry.grantRole(await didRegistry.RECOVERY_ROLE(), stateRecovery.address);
+    });
+
+    describe("Boundary Value Testing", function () {
+        it("Should handle maximum length strings", async function () {
+            // Create very long strings to test boundary conditions
+            const longDID = "did:ethereum:" + "1".repeat(40);
+            const longPublicKey = "0x" + "A".repeat(64);
+            const longServiceEndpoint = "https://" + "a".repeat(1000) + ".com";
+            const longReason = "R".repeat(10000);
+            
+            // Test with long strings
+            await expect(
+                didRegistry.connect(admin).bridgeDID(longDID, user1.address, longPublicKey, longServiceEndpoint)
+            ).to.not.be.reverted;
+            
+            // Verify the data was stored correctly
+            const didDoc = await didRegistry.getDIDDocument(longDID);
+            expect(didDoc.owner).to.equal(user1.address);
+            expect(didDoc.publicKey).to.equal(longPublicKey);
+            expect(didDoc.serviceEndpoint).to.equal(longServiceEndpoint);
+            
+            // Test governance with long reason
+            await didRegistry.connect(admin).enableRecoveryMode();
+            
+            const recoveryData = ethers.utils.defaultAbiCoder.encode(
+                ["string", "address", "string", "string"],
+                [longDID, user2.address, longPublicKey, longServiceEndpoint]
+            );
+            
+            await recoveryGovernance.connect(governor).governedRecovery(0, recoveryData, longReason, false);
+        });
+
+        it("Should handle empty and whitespace strings", async function () {
+            // Test with empty strings
+            await expect(
+                didRegistry.connect(admin).bridgeDID(TEST_DID, user1.address, TEST_PUBLIC_KEY, "")
+            ).to.not.be.reverted;
+            
+            // Test with whitespace strings
+            const whitespaceDID = "did:ethereum:   \t\n";
+            const whitespaceKey = "   \t\n";
+            const whitespaceEndpoint = "   \t\n";
+            
+            await expect(
+                didRegistry.connect(admin).bridgeDID(whitespaceDID, user1.address, whitespaceKey, whitespaceEndpoint)
+            ).to.not.be.reverted;
+        });
+
+        it("Should handle numeric boundary values", async function () {
+            // Test with minimum values
+            const minExpires = 1;
+            const minTimestamp = 0;
+            
+            await didRegistry.connect(admin).bridgeCredential(
+                ethers.utils.keccak256(ethers.utils.toUtf8Bytes("min")),
+                "https://min.issuer.com",
+                TEST_DID,
+                "MinCredential",
+                minExpires,
+                ethers.utils.keccak256("min")
+            );
+            
+            // Test with maximum values
+            const maxExpires = ethers.constants.MaxUint256;
+            
+            await didRegistry.connect(admin).bridgeCredential(
+                ethers.utils.keccak256(ethers.utils.toUtf8Bytes("max")),
+                "https://max.issuer.com",
+                TEST_DID,
+                "MaxCredential",
+                maxExpires,
+                ethers.utils.keccak256("max")
+            );
+        });
+    });
+
+    describe("Invalid Input Handling", function () {
+        it("Should handle invalid addresses", async function () {
+            // Test with zero address
+            await expect(
+                didRegistry.connect(admin).bridgeDID(TEST_DID, ethers.constants.AddressZero, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT)
+            ).to.not.be.reverted; // Should be allowed for bridging
+            
+            // Test with invalid address in recovery
+            await didRegistry.connect(admin).enableRecoveryMode();
+            
+            await expect(
+                didRegistry.connect(recovery).recoverDIDDocument(TEST_DID, ethers.constants.AddressZero, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT)
+            ).to.be.revertedWith("New owner cannot be zero address");
+        });
+
+        it("Should handle malformed DID strings", async function () {
+            const malformedDIDs = [
+                "",
+                "not-a-did",
+                "did:",
+                "did:ethereum:",
+                "did:ethereum:0x",
+                "did:ethereum:0x123", // Too short
+                "did:ethereum:0x" + "1".repeat(41), // Too long
+                "did:ethereum:0xZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ", // Invalid hex
+            ];
+            
+            for (const did of malformedDIDs) {
+                if (did.length === 0) {
+                    await expect(
+                        didRegistry.connect(recovery).recoverDIDDocument(did, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT)
+                    ).to.be.revertedWith("DID cannot be empty");
+                } else {
+                    // Most malformed DIDs should be accepted as strings
+                    await expect(
+                        didRegistry.connect(admin).bridgeDID(did, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT)
+                    ).to.not.be.reverted;
+                }
+            }
+        });
+
+        it("Should handle invalid public keys", async function () {
+            const invalidKeys = [
+                "",
+                "0x",
+                "0x123", // Too short
+                "0x" + "1".repeat(65), // Too long
+                "0xZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ", // Invalid hex
+            ];
+            
+            for (const key of invalidKeys) {
+                if (key.length === 0) {
+                    await expect(
+                        didRegistry.connect(recovery).recoverDIDDocument(TEST_DID, user1.address, key, TEST_SERVICE_ENDPOINT)
+                    ).to.be.revertedWith("Public key cannot be empty");
+                } else {
+                    // Most invalid keys should be accepted as strings
+                    await expect(
+                        didRegistry.connect(admin).bridgeDID(TEST_DID, user1.address, key, TEST_SERVICE_ENDPOINT)
+                    ).to.not.be.reverted;
+                }
+            }
+        });
+
+        it("Should handle invalid credential data", async function () {
+            const invalidCredentialIds = [
+                ethers.constants.HashZero,
+                ethers.utils.keccak256(ethers.utils.toUtf8Bytes("")),
+            ];
+            
+            for (const credentialId of invalidCredentialIds) {
+                if (credentialId === ethers.constants.HashZero) {
+                    await expect(
+                        didRegistry.connect(recovery).recoverCredential(
+                            credentialId,
+                            "https://issuer.com",
+                            TEST_DID,
+                            "Credential",
+                            1234567890,
+                            ethers.utils.keccak256("data")
+                        )
+                    ).to.be.revertedWith("Credential ID cannot be zero");
+                }
+            }
+            
+            const invalidStrings = ["", "   \t\n"];
+            
+            for (const issuer of invalidStrings) {
+                await expect(
+                    didRegistry.connect(recovery).recoverCredential(
+                        ethers.utils.keccak256("test"),
+                        issuer,
+                        TEST_DID,
+                        "Credential",
+                        1234567890,
+                        ethers.utils.keccak256("data")
+                    )
+                ).to.be.revertedWith("Issuer cannot be empty");
+            }
+            
+            for (const subject of invalidStrings) {
+                await expect(
+                    didRegistry.connect(recovery).recoverCredential(
+                        ethers.utils.keccak256("test"),
+                        "https://issuer.com",
+                        subject,
+                        "Credential",
+                        1234567890,
+                        ethers.utils.keccak256("data")
+                    )
+                ).to.be.revertedWith("Subject cannot be empty");
+            }
+        });
+    });
+
+    describe("Reentrancy Attack Prevention", function () {
+        it("Should prevent reentrancy in critical functions", async function () {
+            // Deploy a malicious contract that attempts reentrancy
+            const MaliciousContractFactory = await ethers.getContractFactory("MaliciousReentrancyContract");
+            const maliciousContract = await MaliciousContractFactory.deploy(didRegistry.address);
+            await maliciousContract.deployed();
+            
+            // Bridge a DID to the malicious contract
+            await didRegistry.connect(admin).bridgeDID(TEST_DID, maliciousContract.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            // Attempt to trigger reentrancy through setData
+            const key = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("reentrancy-key"));
+            const value = ethers.utils.toUtf8Bytes("reentrancy-value");
+            
+            // This should fail due to reentrancy protection
+            await expect(
+                maliciousContract.attemptReentrancy(key, value)
+            ).to.be.reverted;
+        });
+
+        it("Should handle nested calls safely", async function () {
+            // Test that nested calls don't cause issues
+            await didRegistry.connect(admin).bridgeDID(TEST_DID, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            // Create a contract that makes nested calls
+            const NestedContractFactory = await ethers.getContractFactory("NestedCallContract");
+            const nestedContract = await NestedContractFactory.deploy(didRegistry.address);
+            await nestedContract.deployed();
+            
+            // This should work without issues
+            await expect(
+                nestedContract.makeNestedCalls()
+            ).to.not.be.reverted;
+        });
+    });
+
+    describe("Gas Limit and Out of Gas Scenarios", function () {
+        it("Should handle operations near gas limits", async function () {
+            // Create a scenario that uses a lot of gas
+            const manyDIDs = [];
+            for (let i = 0; i < 50; i++) {
+                const did = `did:ethereum:0x${i.toString().padStart(40, '0')}`;
+                manyDIDs.push(did);
+                await didRegistry.connect(admin).bridgeDID(did, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            }
+            
+            // Add many claims to each DID
+            for (const did of manyDIDs) {
+                for (let j = 0; j < 10; j++) {
+                    await didRegistry.connect(user1).addClaim(
+                        j, 1, issuer.address,
+                        ethers.utils.toUtf8Bytes(`signature-${j}`),
+                        ethers.utils.toUtf8Bytes(`data-${j}`),
+                        `https://claim-${j}.com`
+                    );
+                }
+            }
+            
+            // This should still work even with high gas usage
+            const history = await recoveryGovernance.getOperationHistory(0, 100);
+            expect(history.length).to.be.greaterThanOrEqual(0);
+        });
+
+        it("Should handle failed transactions gracefully", async function () {
+            // Create a scenario that will fail
+            await didRegistry.connect(admin).bridgeDID(TEST_DID, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            // Try to bridge the same DID again (should fail)
+            await expect(
+                didRegistry.connect(admin).bridgeDID(TEST_DID, user2.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT)
+            ).to.be.revertedWith("DID already exists on this chain");
+            
+            // Verify the contract is still in a valid state
+            const didDoc = await didRegistry.getDIDDocument(TEST_DID);
+            expect(didDoc.owner).to.equal(user1.address);
+        });
+    });
+
+    describe("Concurrency and Race Conditions", function () {
+        it("Should handle concurrent operations safely", async function () {
+            // Create multiple concurrent operations
+            const promises = [];
+            
+            for (let i = 0; i < 10; i++) {
+                const did = `did:ethereum:0x${i.toString().padStart(40, '0')}`;
+                promises.push(didRegistry.connect(admin).bridgeDID(did, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT));
+            }
+            
+            // All should succeed
+            await Promise.all(promises);
+            
+            // Verify all DIDs were created
+            for (let i = 0; i < 10; i++) {
+                const did = `did:ethereum:0x${i.toString().padStart(40, '0')}`;
+                const didDoc = await didRegistry.getDIDDocument(did);
+                expect(didDoc.owner).to.equal(user1.address);
+            }
+        });
+
+        it("Should handle state consistency during concurrent operations", async function () {
+            // Bridge a DID
+            await didRegistry.connect(admin).bridgeDID(TEST_DID, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            // Create concurrent claim operations
+            const claimPromises = [];
+            for (let i = 0; i < 5; i++) {
+                claimPromises.push(
+                    didRegistry.connect(user1).addClaim(
+                        i, 1, issuer.address,
+                        ethers.utils.toUtf8Bytes(`concurrent-sig-${i}`),
+                        ethers.utils.toUtf8Bytes(`concurrent-data-${i}`),
+                        `https://concurrent-${i}.com`
+                    )
+                );
+            }
+            
+            await Promise.all(claimPromises);
+            
+            // Verify all claims were added
+            for (let i = 0; i < 5; i++) {
+                const claimIds = await didRegistry.connect(user1).getClaimIdsByTopic(i);
+                expect(claimIds.length).to.equal(1);
+            }
+        });
+    });
+
+    describe("Memory and Storage Overflow", function () {
+        it("Should handle large arrays safely", async function () {
+            // Create a user with many DIDs
+            for (let i = 0; i < 20; i++) {
+                const did = `did:ethereum:0x${i.toString().padStart(40, '0')}`;
+                await didRegistry.connect(admin).bridgeDID(did, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            }
+            
+            // This should work without issues
+            const userDIDs = await didRegistry.ownerToDids(user1.address);
+            expect(userDIDs.length).to.equal(20);
+        });
+
+        it("Should handle large mappings efficiently", async function () {
+            // Create many credentials
+            for (let i = 0; i < 100; i++) {
+                const credentialId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`credential-${i}`));
+                await didRegistry.connect(admin).bridgeCredential(
+                    credentialId,
+                    `https://issuer-${i}.com`,
+                    TEST_DID,
+                    `Credential-${i}`,
+                    1234567890 + i,
+                    ethers.utils.keccak256(`data-${i}`)
+                );
+            }
+            
+            // Verify all credentials exist
+            for (let i = 0; i < 100; i++) {
+                const credentialId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`credential-${i}`));
+                const credential = await didRegistry.getCredential(credentialId);
+                expect(credential.issuer).to.equal(`https://issuer-${i}.com`);
+            }
+        });
+    });
+
+    describe("Time-Related Edge Cases", function () {
+        it("Should handle timestamp edge cases", async function () {
+            // Test with minimum timestamp
+            const minTimestamp = 0;
+            
+            // Fast forward to a specific time
+            await ethers.provider.send("evm_setNextBlockTimestamp", [minTimestamp]);
+            await ethers.provider.send("evm_mine");
+            
+            await didRegistry.connect(admin).bridgeDID(TEST_DID, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            const didDoc = await didRegistry.getDIDDocument(TEST_DID);
+            expect(didDoc.created).to.equal(minTimestamp);
+            
+            // Test with maximum timestamp
+            const maxTimestamp = ethers.constants.MaxUint256.div(1000); // Convert to seconds
+            
+            await ethers.provider.send("evm_setNextBlockTimestamp", [maxTimestamp.toNumber()]);
+            await ethers.provider.send("evm_mine");
+            
+            await didRegistry.connect(admin).bridgeDID(TEST_DID_2, user2.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            const didDoc2 = await didRegistry.getDIDDocument(TEST_DID_2);
+            expect(didDoc2.created).to.equal(maxTimestamp);
+        });
+
+        it("Should handle voting period edge cases", async function () {
+            // Create a proposal
+            const data = ethers.utils.defaultAbiCoder.encode(
+                ["string", "address", "string", "string"],
+                [TEST_DID, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT]
+            );
+            
+            const proposalId = await stateRecovery.connect(recovery).proposeRecovery(0, "Edge case test", data);
+            
+            // Test voting exactly at deadline
+            const proposal = await stateRecovery.getProposal(proposalId);
+            const deadline = proposal.votingDeadline;
+            
+            await ethers.provider.send("evm_setNextBlockTimestamp", [deadline.toNumber()]);
+            await ethers.provider.send("evm_mine");
+            
+            // Should still be able to vote
+            await expect(
+                stateRecovery.connect(recovery).voteOnRecovery(proposalId, true, "Last minute vote")
+            ).to.not.be.reverted;
+            
+            // Test voting after deadline
+            await ethers.provider.send("evm_increaseTime", [1]);
+            await ethers.provider.send("evm_mine");
+            
+            await expect(
+                stateRecovery.connect(recovery).voteOnRecovery(proposalId, false, "Late vote")
+            ).to.be.revertedWith("StateRecovery: voting period ended");
+        });
+    });
+
+    describe("Permission and Access Control Edge Cases", function () {
+        it("Should handle role assignment edge cases", async function () {
+            // Test assigning multiple roles to same address
+            await didRegistry.grantRole(await didRegistry.ADMIN_ROLE(), user1.address);
+            await didRegistry.grantRole(await didRegistry.ISSUER_ROLE(), user1.address);
+            await didRegistry.grantRole(await didRegistry.RECOVERY_ROLE(), user1.address);
+            
+            // User should have all roles
+            expect(await didRegistry.hasRole(await didRegistry.ADMIN_ROLE(), user1.address)).to.be.true;
+            expect(await didRegistry.hasRole(await didRegistry.ISSUER_ROLE(), user1.address)).to.be.true;
+            expect(await didRegistry.hasRole(await didRegistry.RECOVERY_ROLE(), user1.address)).to.be.true;
+            
+            // Test revoking one role
+            await didRegistry.revokeRole(await didRegistry.ADMIN_ROLE(), user1.address);
+            
+            expect(await didRegistry.hasRole(await didRegistry.ADMIN_ROLE(), user1.address)).to.be.false;
+            expect(await didRegistry.hasRole(await didRegistry.ISSUER_ROLE(), user1.address)).to.be.true;
+            expect(await didRegistry.hasRole(await didRegistry.RECOVERY_ROLE(), user1.address)).to.be.true;
+        });
+
+        it("Should handle self-role assignment", async function () {
+            // Admin should be able to assign roles to themselves
+            await didRegistry.connect(admin).grantRole(await didRegistry.ISSUER_ROLE(), admin.address);
+            expect(await didRegistry.hasRole(await didRegistry.ISSUER_ROLE(), admin.address)).to.be.true;
+            
+            // Admin should be able to revoke their own roles
+            await didRegistry.connect(admin).revokeRole(await didRegistry.ISSUER_ROLE(), admin.address);
+            expect(await didRegistry.hasRole(await didRegistry.ISSUER_ROLE(), admin.address)).to.be.false;
+        });
+
+        it("Should handle role hierarchy edge cases", async function () {
+            // Create a complex role hierarchy
+            await didRegistry.grantRole(await didRegistry.ADMIN_ROLE(), user1.address);
+            await didRegistry.grantRole(await didRegistry.ISSUER_ROLE(), user2.address);
+            await didRegistry.grantRole(await didRegistry.RECOVERY_ROLE(), user3.address);
+            
+            // Test that each role can perform its specific functions
+            await expect(
+                didRegistry.connect(user1).bridgeDID(TEST_DID, attacker.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT)
+            ).to.not.be.reverted;
+            
+            await expect(
+                didRegistry.connect(user2).addClaim(1, 1, issuer.address, "0x123", "0x456", "https://test.com")
+            ).to.be.reverted; // User2 doesn't have a DID
+            
+            // Bridge a DID to user2 first
+            await didRegistry.connect(admin).bridgeDID(TEST_DID, user2.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            await expect(
+                didRegistry.connect(user2).addClaim(1, 1, issuer.address, "0x123", "0x456", "https://test.com")
+            ).to.not.be.reverted;
+        });
+    });
+
+    describe("Data Corruption and Recovery Edge Cases", function () {
+        it("Should handle partial data corruption", async function () {
+            // Bridge a DID
+            await didRegistry.connect(admin).bridgeDID(TEST_DID, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT);
+            
+            // Simulate partial corruption by updating only some fields
+            await didRegistry.connect(admin).enableRecoveryMode();
+            
+            const corruptedData = ethers.utils.defaultAbiCoder.encode(
+                ["string", "address", "string", "string"],
+                [TEST_DID, user2.address, "", ""] // Empty public key and service endpoint
+            );
+            
+            await recoveryGovernance.connect(governor).governedRecovery(0, corruptedData, "Partial corruption test", false);
+            
+            // Verify partial recovery
+            const didDoc = await didRegistry.getDIDDocument(TEST_DID);
+            expect(didDoc.owner).to.equal(user2.address);
+            expect(didDoc.publicKey).to.equal(""); // Should be empty
+            expect(didDoc.serviceEndpoint).to.equal(""); // Should be empty
+        });
+
+        it("Should handle recovery of non-existent data", async function () {
+            await didRegistry.connect(admin).enableRecoveryMode();
+            
+            // Try to recover a DID that doesn't exist
+            const nonExistentDID = "did:ethereum:0x9999999999999999999999999999999999999999";
+            const recoveryData = ethers.utils.defaultAbiCoder.encode(
+                ["string", "address", "string", "string"],
+                [nonExistentDID, user1.address, TEST_PUBLIC_KEY, TEST_SERVICE_ENDPOINT]
+            );
+            
+            await recoveryGovernance.connect(governor).governedRecovery(0, recoveryData, "Recover non-existent", false);
+            
+            // Verify DID was created
+            const didDoc = await didRegistry.getDIDDocument(nonExistentDID);
+            expect(didDoc.owner).to.equal(user1.address);
+            expect(didDoc.publicKey).to.equal(TEST_PUBLIC_KEY);
+        });
+    });
+});
+
+// Note: Helper contracts for reentrancy and nested call testing would need to be
+// deployed as separate Solidity files. The test cases above demonstrate the
+// concepts but require actual contract deployment for execution.

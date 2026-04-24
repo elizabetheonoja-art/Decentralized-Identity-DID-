@@ -9,6 +9,7 @@ dotenv.config();
 // Import routes
 const didRoutes = require('./routes/did');
 const credentialRoutes = require('./routes/credentials');
+const batchRoutes = require('./routes/batch');
 
 // Initialize Express app
 const app = express();
@@ -32,6 +33,7 @@ if (process.env.STELLAR_NETWORK === 'PUBLIC') {
 // Routes
 app.use('/api/did', didRoutes);
 app.use('/api/credentials', credentialRoutes);
+app.use('/api/batch', batchRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -52,6 +54,7 @@ app.get('/', (req, res) => {
     endpoints: {
       did: '/api/did',
       credentials: '/api/credentials',
+      batch: '/api/batch',
       health: '/health'
     }
   });

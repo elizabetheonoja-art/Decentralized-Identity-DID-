@@ -26,24 +26,23 @@ contract EthereumDIDRegistry is IERC725, IERC735 {
     bool public recoveryMode;
     
     struct DIDDocument {
-        string did;
         address owner;
-        string publicKey;
         uint256 created;
         uint256 updated;
         bool active;
+        string publicKey;
         string serviceEndpoint;
     }
     
     struct VerifiableCredential {
         bytes32 id;
+        uint256 issued;
+        uint256 expires;
+        bool revoked;
         string issuer;
         string subject;
         string credentialType;
-        uint256 issued;
-        uint256 expires;
         bytes32 dataHash;
-        bool revoked;
     }
     
     mapping(string => DIDDocument) public didDocuments;
@@ -102,15 +101,14 @@ contract EthereumDIDRegistry is IERC725, IERC735 {
         string memory publicKey,
         string memory serviceEndpoint
     ) external onlyRole(ADMIN_ROLE) returns (bool) {
-        require(bytes(didDocuments[did].did).length == 0, "DID already exists on this chain");
+        require(didDocuments[did].owner == address(0), "DID already exists on this chain");
         
         didDocuments[did] = DIDDocument({
-            did: did,
             owner: ownerAddress,
-            publicKey: publicKey,
             created: block.timestamp,
             updated: block.timestamp,
             active: true,
+            publicKey: publicKey,
             serviceEndpoint: serviceEndpoint
         });
         

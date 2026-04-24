@@ -1,4 +1,5 @@
 const { override } = require('customize-cra');
+const path = require('path');
 
 module.exports = override(
   (config) => {
@@ -34,6 +35,61 @@ module.exports = override(
           }
         };
       }
+    }
+
+    // Configure module resolution for optimized images
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@images': path.resolve(__dirname, 'public/images'),
+      '@optimized': path.resolve(__dirname, 'public/images/optimized')
+    };
+
+    // Add support for WebP in file loader
+    const fileLoaderRule = config.module.rules.find(
+      rule => rule.test && rule.test.toString().includes('png|jpg|jpeg|gif')
+    );
+
+    if (fileLoaderRule) {
+      fileLoaderRule.test = /\.(png|jpe?g|gif|webp|svg)$/i;
+    }
+
+    // Add optimization for images in production
+    if (config.mode === 'production') {
+      const ImageMinimizerPlugin = require('image-minimizer-webpack-plugin');
+      const imagemin = require('imagemin');
+      const imageminWebp = require('imagemin-webp');
+      const imageminMozjpeg = require('imagemin-mozjpeg');
+      const imageminPngquant = require('imagemin-pngquant');
+
+      config.plugins.push(
+        new ImageMinimizerPlugin({
+          minimizer: [
+            {
+              implementation: ImageMinimizerPlugin.imageminMinify,
+              options: {
+                plugins: [
+                  imageminWebp({ quality: 80 }),
+                  imageminMozjpeg({ quality: 85 }),
+                  imageminPngquant({ quality: [0.8, 0.9] })
+                ]
+              }
+            }
+          ],
+          generator: [
+            {
+              type: 'asset',
+              preset: 'webp-custom-name',
+              filename: '[name].[hash].[ext]',
+              minimizer: {
+                implementation: ImageMinimizerPlugin.imageminGenerate,
+                options: {
+                  plugins: [['imagemin-webp', { quality: 80 }]]
+                }
+              }
+            }
+          ]
+        })
+      );
     }
     
     return config;

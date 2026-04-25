@@ -1,0 +1,149 @@
+groups:
+  - name: stellar-did-backend-alerts
+    rules:
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: rate(error_rate_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: stellar-did-backend
+        annotations:
+          summary: "High error rate detected in Stellar DID Backend"
+          description: "Error rate is {{ $value }} errors per second for the last 5 minutes"
+
+      # High memory usage alert
+      - alert: HighMemoryUsage
+        expr: (resource_utilization{resource_type="memory_heap_used"} / resource_utilization{resource_type="memory_heap_total"}) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: stellar-did-backend
+        annotations:
+          summary: "Memory usage above 90%"
+          description: "Memory usage is {{ $value | humanizePercentage }} of total heap"
+
+      # High response time alert
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: stellar-did-backend
+        annotations:
+          summary: "95th percentile response time is high"
+          description: "95th percentile response time is {{ $value }}s"
+
+      # Service down alert
+      - alert: ServiceDown
+        expr: up{job="stellar-did-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: stellar-did-backend
+        annotations:
+          summary: "Stellar DID Backend service is down"
+          description: "The Stellar DID Backend service has been down for more than 1 minute"
+
+      # Low cache hit rate alert
+      - alert: LowCacheHitRate
+        expr: cache_hit_rate < 80
+        for: 5m
+        labels:
+          severity: warning
+          service: stellar-did-backend
+        annotations:
+          summary: "Cache hit rate is below 80%"
+          description: "Cache hit rate is {{ $value }}%"
+
+      # Database connection issues
+      - alert: DatabaseConnectionIssues
+        expr: database_connections{type="active"} > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: stellar-did-backend
+        annotations:
+          summary: "High database connection usage"
+          description: "Active database connections: {{ $value }}"
+
+      # Queue size alert
+      - alert: HighQueueSize
+        expr: queue_size > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: stellar-did-backend
+        annotations:
+          summary: "High queue size detected"
+          description: "Queue {{ $labels.queue_name }} size is {{ $value }}"
+
+      # Authentication failure rate
+      - alert: HighAuthenticationFailureRate
+        expr: rate(authentication_attempts_total{status="failed"}[5m]) / rate(authentication_attempts_total[5m]) > 0.3
+        for: 2m
+        labels:
+          severity: warning
+          service: stellar-did-backend
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value | humanizePercentage }}"
+
+      # Blockchain sync issues
+      - alert: BlockchainSyncIssues
+        expr: blockchain_sync_status{blockchain="stellar"} < 1
+        for: 5m
+        labels:
+          severity: critical
+          service: stellar-did-backend
+        annotations:
+          summary: "Blockchain sync issues"
+          description: "Stellar blockchain sync status is {{ $value }}"
+
+      # High gas usage alert
+      - alert: HighGasUsage
+        expr: histogram_quantile(0.95, rate(gas_usage_histogram_bucket[5m])) > 500000
+        for: 5m
+        labels:
+          severity: warning
+          service: stellar-did-backend
+        annotations:
+          summary: "High gas usage detected"
+          description: "95th percentile gas usage is {{ $value }}"
+
+  - name: system-alerts
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}%"
+
+      # Disk space usage
+      - alert: DiskSpaceUsage
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Disk space usage is high"
+          description: "Disk usage is {{ $value }}%"
+
+  - name: container-alerts
+    rules:
+      # Container restart alert
+      - alert: ContainerRestart
+        expr: increase(container_start_time_seconds[1h]) > 0
+        for: 0m
+        labels:
+          severity: info
+          service: container
+        annotations:
+          summary: "Container has restarted"
+          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last hour"

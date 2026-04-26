@@ -1,24 +1,7 @@
-let DIDContract;
-try {
-  DIDContract = require('../../contracts/stellar/DIDContract');
-} catch (err) {
-  // If contract file is missing, use a dummy contract object for development
-  console.warn('⚠️  DIDContract file not found, using dummy contract object for development');
-  
-  // Create a dummy class that can be instantiated
-  DIDContract = class DummyContract {
-    constructor(horizonUrl) {
-      this.horizonUrl = horizonUrl;
-      this.contractAddress = null;
-      this.methods = {};
-      this.spec = {};
-      this.contractId = 'dummy-contract-id';
-    }
-  };
-}
-
+const DIDContract = require('../../contracts/stellar/DIDContract');
 const StellarSDK = require('stellar-sdk');
-const logger = require('../utils/logger');
+const logger = require('../middleware').logger;
+const stellarConnection = require('../utils/stellarConnection');
 
 // Custom error classes for better error handling
 class ContractAddressNotSetError extends Error {
@@ -27,6 +10,7 @@ class ContractAddressNotSetError extends Error {
     this.name = 'ContractAddressNotSet';
   }
 }
+// ... (rest of the error classes)
 
 class ContractDeploymentFailedError extends Error {
   constructor(message) {
@@ -345,11 +329,7 @@ class ContractService {
    */
   async getAccount(publicKey) {
     try {
-      const server = new StellarSDK.Horizon.Server(
-        process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org'
-      );
-      
-      const account = await server.loadAccount(publicKey);
+      const account = await stellarConnection.loadAccount(publicKey);
       
       logger.debug('Account information retrieved', { publicKey });
       

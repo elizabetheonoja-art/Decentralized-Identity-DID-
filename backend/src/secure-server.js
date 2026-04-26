@@ -1,10 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
+
+// Import new services
+const retentionService = require('./services/retentionService');
+const { logger } = require('./middleware');
 
 // Security middleware
 app.use(helmet({
@@ -18,6 +23,16 @@ app.use(helmet({
   },
 }));
 
+// Robust Request/Response Compression (#130)
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
 // CORS configuration
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -28,8 +43,8 @@ app.use(cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   message: {
     error: 'Too many requests from this IP, please try again later.',
   },
@@ -42,14 +57,12 @@ app.use(express.urlencoded({ extended: true }));
 
 // API configuration endpoint (secure)
 app.get('/api/config', (req, res) => {
-  // Only expose non-sensitive configuration to frontend
   const publicConfig = {
     STELLAR_NETWORK: process.env.STELLAR_NETWORK,
     DID_METHOD: process.env.DID_METHOD,
     ENABLE_FREIGHTER: process.env.ENABLE_FREIGHTER !== 'false',
     ENABLE_ADVANCED_FEATURES: process.env.ENABLE_ADVANCED_FEATURES !== 'false',
   };
-  
   res.json(publicConfig);
 });
 
@@ -64,6 +77,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/v1', require('./routes'));
+app.use('/api/v1/api-keys', require('./routes/apiKeys')); // Added API Key Management (#127)
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -83,6 +97,10 @@ app.use('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Initialize Retention Service (#129)
+retentionService.init();
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
